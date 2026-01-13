@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/medicine_model.dart';
 import '../providers/medicine_notifier.dart';
-import '../../../../services/notification_service.dart';
 import '../widgets/time_slider.dart';
 
 class AddMedicineScreen extends ConsumerStatefulWidget {
@@ -20,6 +19,8 @@ class _AddMedicineScreenState extends ConsumerState<AddMedicineScreen> {
 
   // Default to today at the current time
   DateTime _selectedTime = DateTime.now();
+  // Always use default sound
+  final String _selectedSound = 'medicine_reminder.mp3';
 
   /// Logic to save to local storage and schedule the high-priority alarm
   void _saveMedicine() async {
@@ -31,12 +32,10 @@ class _AddMedicineScreenState extends ConsumerState<AddMedicineScreen> {
       );
 
       try {
-        // 1. Persist data to Hive through the Riverpod Notifier
-        await ref.read(medicineProvider.notifier).addMedicine(newMed);
-
-        // 2. Schedule the exact high-priority alarm
-
-        await NotificationService.scheduleAlarm(newMed);
+        // 1. Persist data to Hive through the Riverpod Notifier with custom sound
+        await ref
+            .read(medicineProvider.notifier)
+            .addMedicine(newMed, customSound: _selectedSound);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -95,8 +94,6 @@ class _AddMedicineScreenState extends ConsumerState<AddMedicineScreen> {
                     : null,
               ),
               const SizedBox(height: 40),
-              // _buildLabel("Reminder Time"),
-              // const SizedBox(height: 12),
 
               // Custom interactive timeline slider for time selection
               Center(

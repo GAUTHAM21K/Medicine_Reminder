@@ -45,11 +45,13 @@ class NotificationService {
           description: 'Used for scheduled medicine alarms',
           importance: Importance.max,
           playSound: true,
+          sound: RawResourceAndroidNotificationSound('medicine_reminder'),
         ));
   }
 
   /// Schedules a notification with high priority and exact timing
-  static Future<void> scheduleAlarm(MedicineModel medicine) async {
+  static Future<void> scheduleAlarm(MedicineModel medicine,
+      {String? customSound}) async {
     final now = DateTime.now();
     final scheduledDate = medicine.scheduledTime;
 
@@ -61,12 +63,16 @@ class NotificationService {
       tzScheduledDate = tzScheduledDate.add(const Duration(days: 1));
     }
 
+    // Configure sound settings
+    String? soundFile =
+        customSound ?? 'medicine_reminder.mp3'; // Default sound file
+
     await _notificationsPlugin.zonedSchedule(
       medicine.id.hashCode,
       'Medicine Reminder',
       'Time to take ${medicine.dosage} of ${medicine.name}',
       tzScheduledDate,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           'med_reminder_channel',
           'Medicine Reminders',
@@ -74,11 +80,16 @@ class NotificationService {
           priority: Priority.high,
           fullScreenIntent: true,
           category: AndroidNotificationCategory.alarm,
+          sound: soundFile.isNotEmpty
+              ? RawResourceAndroidNotificationSound(soundFile.split('.').first)
+              : null,
+          playSound: true,
         ),
         iOS: DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
+          sound: soundFile,
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -87,7 +98,8 @@ class NotificationService {
     );
 
     if (kDebugMode) {
-      debugPrint("Alarm scheduled for: $tzScheduledDate");
+      debugPrint(
+          "Alarm scheduled for: $tzScheduledDate with sound: $soundFile");
     }
   }
 

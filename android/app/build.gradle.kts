@@ -7,8 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.medicine_reminder"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 36
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
@@ -20,9 +19,20 @@ android {
         jvmTarget = "17"
     }
 
+    // Add packaging options to avoid conflicts
+    packaging {
+        jniLibs {
+            pickFirsts += "**/libc++_shared.so"
+            pickFirsts += "**/libjsc.so"
+        }
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.example.medicine_reminder"
-        minSdk = flutter.minSdkVersion
+        minSdk = flutter.minSdkVersion  // Explicit minimum SDK for better compatibility
         targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -30,7 +40,15 @@ android {
 
     buildTypes {
         release {
+            // Use debug signing for development/testing
             signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+            isShrinkResources = false
+            isDebuggable = false
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = true
         }
     }
 }

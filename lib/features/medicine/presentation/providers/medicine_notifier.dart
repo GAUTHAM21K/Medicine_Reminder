@@ -22,26 +22,6 @@ final notificationPermissionProvider =
   return await Permission.notification.status;
 });
 
-// Time picker state providers for edit popup
-final selectedHourProvider =
-    StateNotifierProvider<_IntNotifier, int>((ref) => _IntNotifier(12));
-final selectedMinuteProvider =
-    StateNotifierProvider<_IntNotifier, int>((ref) => _IntNotifier(0));
-final isPmProvider =
-    StateNotifierProvider<_BoolNotifier, bool>((ref) => _BoolNotifier(false));
-
-class _IntNotifier extends StateNotifier<int> {
-  _IntNotifier(int initialValue) : super(initialValue);
-
-  void update(int value) => state = value;
-}
-
-class _BoolNotifier extends StateNotifier<bool> {
-  _BoolNotifier(bool initialValue) : super(initialValue);
-
-  void update(bool value) => state = value;
-}
-
 // Update the notifier to use the repository
 class MedicineNotifier extends StateNotifier<List<MedicineModel>> {
   final MedicineRepository _repository;
@@ -83,12 +63,13 @@ class MedicineNotifier extends StateNotifier<List<MedicineModel>> {
     _repository.updateMedicine(state.firstWhere((m) => m.id == id));
   }
 
-  Future<void> addMedicine(MedicineModel medicine) async {
+  Future<void> addMedicine(MedicineModel medicine,
+      {String? customSound}) async {
     try {
       _ref.read(medicineLoadingProvider.notifier).state = true;
       _ref.read(medicineErrorProvider.notifier).state = null;
 
-      await _repository.addMedicine(medicine);
+      await _repository.addMedicine(medicine, customSound: customSound);
       _loadAndSort();
     } catch (e) {
       _ref.read(medicineErrorProvider.notifier).state =
@@ -98,12 +79,13 @@ class MedicineNotifier extends StateNotifier<List<MedicineModel>> {
     }
   }
 
-  Future<void> updateMedicine(MedicineModel medicine) async {
+  Future<void> updateMedicine(MedicineModel medicine,
+      {String? customSound}) async {
     try {
       _ref.read(medicineLoadingProvider.notifier).state = true;
       _ref.read(medicineErrorProvider.notifier).state = null;
 
-      await _repository.updateMedicine(medicine);
+      await _repository.updateMedicine(medicine, customSound: customSound);
       _loadAndSort();
     } catch (e) {
       _ref.read(medicineErrorProvider.notifier).state =

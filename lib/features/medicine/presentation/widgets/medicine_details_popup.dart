@@ -14,7 +14,8 @@ class MedicineDetailsPopup extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<MedicineDetailsPopup> createState() => _MedicineDetailsPopupState();
+  ConsumerState<MedicineDetailsPopup> createState() =>
+      _MedicineDetailsPopupState();
 }
 
 class _MedicineDetailsPopupState extends ConsumerState<MedicineDetailsPopup> {
@@ -26,6 +27,11 @@ class _MedicineDetailsPopupState extends ConsumerState<MedicineDetailsPopup> {
   late FixedExtentScrollController minuteController;
   late FixedExtentScrollController amPmController;
 
+  // Local state for time selection
+  late int selectedHour;
+  late int selectedMinute;
+  late bool isPm;
+
   @override
   void initState() {
     super.initState();
@@ -33,14 +39,9 @@ class _MedicineDetailsPopupState extends ConsumerState<MedicineDetailsPopup> {
     dosageController = TextEditingController(text: widget.medicine.dosage);
 
     final time = widget.medicine.scheduledTime;
-    final selectedHour = time.hour % 12 == 0 ? 12 : time.hour % 12;
-    final selectedMinute = time.minute;
-    final isPm = time.hour >= 12;
-
-    // Initialize providers with the medicine's current time
-    ref.read(selectedHourProvider.notifier).update(selectedHour);
-    ref.read(selectedMinuteProvider.notifier).update(selectedMinute);
-    ref.read(isPmProvider.notifier).update(isPm);
+    selectedHour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+    selectedMinute = time.minute;
+    isPm = time.hour >= 12;
 
     hourController = FixedExtentScrollController(initialItem: selectedHour - 1);
     minuteController = FixedExtentScrollController(initialItem: selectedMinute);
@@ -102,7 +103,7 @@ class _MedicineDetailsPopupState extends ConsumerState<MedicineDetailsPopup> {
                   height: 50,
                   width: MediaQuery.of(context).size.width * 0.6,
                   decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.08),
+                    color: Colors.grey.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
@@ -111,11 +112,15 @@ class _MedicineDetailsPopupState extends ConsumerState<MedicineDetailsPopup> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildWheelWithProvider(
+                      _buildWheel(
                         controller: hourController,
                         itemCount: 12,
                         labelBuilder: (index) => (index + 1).toString(),
-                        intProvider: selectedHourProvider,
+                        onChanged: (index) {
+                          setState(() {
+                            selectedHour = index + 1;
+                          });
+                        },
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -123,14 +128,18 @@ class _MedicineDetailsPopupState extends ConsumerState<MedicineDetailsPopup> {
                             style: TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.black.withOpacity(0.2))),
+                                color: Colors.black.withValues(alpha: 0.2))),
                       ),
-                      _buildWheelWithProvider(
+                      _buildWheel(
                         controller: minuteController,
                         itemCount: 60,
                         labelBuilder: (index) =>
                             index.toString().padLeft(2, '0'),
-                        intProvider: selectedMinuteProvider,
+                        onChanged: (index) {
+                          setState(() {
+                            selectedMinute = index;
+                          });
+                        },
                       ),
                     ],
                   ),
@@ -142,24 +151,19 @@ class _MedicineDetailsPopupState extends ConsumerState<MedicineDetailsPopup> {
 
             // --- AM/PM Pill Toggle ---
             Center(
-              child: Consumer(
-                builder: (context, ref, child) {
-                  final isPm = ref.watch(isPmProvider);
-                  return Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildAmPmButton("AM", !isPm),
-                        _buildAmPmButton("PM", isPm),
-                      ],
-                    ),
-                  );
-                },
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildAmPmButton("AM", !isPm),
+                    _buildAmPmButton("PM", isPm),
+                  ],
+                ),
               ),
             ),
 
@@ -204,11 +208,11 @@ class _MedicineDetailsPopupState extends ConsumerState<MedicineDetailsPopup> {
     );
   }
 
-  Widget _buildWheelWithProvider({
+  Widget _buildWheel({
     required FixedExtentScrollController controller,
     required int itemCount,
     required String Function(int) labelBuilder,
-    required StateNotifierProvider<dynamic, int> intProvider,
+    required Function(int) onChanged,
   }) {
     return SizedBox(
       width: 60,
@@ -223,7 +227,7 @@ class _MedicineDetailsPopupState extends ConsumerState<MedicineDetailsPopup> {
         physics: const FixedExtentScrollPhysics(),
         onSelectedItemChanged: (index) {
           HapticFeedback.lightImpact();
-          ref.read(intProvider.notifier).update(index);
+          onChanged(index);
         },
         childDelegate: ListWheelChildBuilderDelegate(
           childCount: itemCount,
@@ -247,7 +251,9 @@ class _MedicineDetailsPopupState extends ConsumerState<MedicineDetailsPopup> {
     return GestureDetector(
       onTap: () {
         if (!isSelected) {
-          ref.read(isPmProvider.notifier).update(label == "PM");
+          setState(() {
+            isPm = label == "PM";
+          });
         }
       },
       child: AnimatedContainer(
@@ -301,10 +307,6 @@ class _MedicineDetailsPopupState extends ConsumerState<MedicineDetailsPopup> {
   }
 
   void _saveChanges() async {
-    final selectedHour = ref.read(selectedHourProvider);
-    final selectedMinute = ref.read(selectedMinuteProvider);
-    final isPm = ref.read(isPmProvider);
-
     int hour24 = selectedHour;
     if (isPm && selectedHour != 12) hour24 += 12;
     if (!isPm && selectedHour == 12) hour24 = 0;
