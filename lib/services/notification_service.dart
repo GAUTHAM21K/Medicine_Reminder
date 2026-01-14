@@ -32,6 +32,10 @@ class NotificationService {
         if (kDebugMode) {
           print("Notification tapped: ${response.payload}");
         }
+        // Handle daily reset notification
+        if (response.id == 999999) {
+          _handleDailyResetNotification();
+        }
       },
     );
 
@@ -47,6 +51,18 @@ class NotificationService {
           playSound: true,
           sound: RawResourceAndroidNotificationSound('medicine_reminder'),
         ));
+
+    // Create the daily reset channel for Android
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(const AndroidNotificationChannel(
+          'daily_reset_channel',
+          'Daily Reset',
+          description: 'Used for daily medicine status reset',
+          importance: Importance.low,
+          playSound: false,
+        ));
   }
 
   /// Schedules a notification with high priority and exact timing
@@ -55,13 +71,23 @@ class NotificationService {
     final now = DateTime.now();
     final scheduledDate = medicine.scheduledTime;
 
-    // Convert to TZDateTime
-    var tzScheduledDate = tz.TZDateTime.from(scheduledDate, tz.local);
+    // Create a DateTime for today with the medicine's time
+    var todayScheduledTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      scheduledDate.hour,
+      scheduledDate.minute,
+      scheduledDate.second,
+    );
 
     // If the time has already passed today, schedule for the next day
-    if (tzScheduledDate.isBefore(now)) {
-      tzScheduledDate = tzScheduledDate.add(const Duration(days: 1));
+    if (todayScheduledTime.isBefore(now)) {
+      todayScheduledTime = todayScheduledTime.add(const Duration(days: 1));
     }
+
+    // Convert to TZDateTime
+    var tzScheduledDate = tz.TZDateTime.from(todayScheduledTime, tz.local);
 
     // Configure sound settings
     String? soundFile =
@@ -93,17 +119,26 @@ class NotificationService {
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      // Note: uiLocalNotificationDateInterpretation is REMOVED for v17+ compatibility
-      matchDateTimeComponents: DateTimeComponents.time,
+      matchDateTimeComponents:
+          DateTimeComponents.time, // This makes it repeat daily
     );
 
     if (kDebugMode) {
       debugPrint(
-          "Alarm scheduled for: $tzScheduledDate with sound: $soundFile");
+          "Recurring alarm scheduled for: $tzScheduledDate (${scheduledDate.hour}:${scheduledDate.minute.toString().padLeft(2, '0')}) with sound: $soundFile");
     }
   }
 
   static Future<void> cancelAlarm(String id) async {
     await _notificationsPlugin.cancel(id.hashCode);
+  }
+
+  /// Handle daily reset notification response
+  static void _handleDailyResetNotification() async {
+    if (kDebugMode) {
+      debugPrint("Daily reset notification received, triggering reset");
+    }
+    // We'll handle this through the main app lifecycle instead
+    // to avoid circular dependencies
   }
 }

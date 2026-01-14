@@ -172,6 +172,35 @@ class MedicineNotifier extends StateNotifier<List<MedicineModel>> {
   void clearError() {
     _ref.read(medicineErrorProvider.notifier).state = null;
   }
+
+  /// Manual daily reset for testing purposes
+  Future<void> performManualReset() async {
+    try {
+      _ref.read(medicineLoadingProvider.notifier).state = true;
+      _ref.read(medicineErrorProvider.notifier).state = null;
+
+      // Get all medicines and reset their status
+      final allMedicines = _repository.getAllMedicines();
+
+      for (final medicine in allMedicines) {
+        final resetMedicine = medicine.copyWith(
+          isTaken: false,
+          isSkipped: false,
+          takenAt: null,
+          snoozedUntil: null,
+        );
+
+        await _repository.updateMedicine(resetMedicine);
+      }
+
+      _loadAndSort();
+    } catch (e) {
+      _ref.read(medicineErrorProvider.notifier).state =
+          'Failed to reset medicines: ${e.toString()}';
+    } finally {
+      _ref.read(medicineLoadingProvider.notifier).state = false;
+    }
+  }
 }
 
 final medicineProvider =

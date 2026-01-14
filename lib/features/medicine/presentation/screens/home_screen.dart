@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../services/permission_service.dart';
 import '../providers/medicine_notifier.dart';
@@ -65,6 +67,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
+        actions: [
+          // Manual reset button for testing
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'reset') {
+                _showResetConfirmation(context, ref);
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'reset',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh, size: 20),
+                    SizedBox(width: 8),
+                    Text('Reset Day'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -72,6 +96,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             children: [
               // 0. Permission warning banner (Notification disabled)
               _buildPermissionWarningBanner(),
+
+              // 0.5. Daily reset status (for debugging)
+              if (kDebugMode) _buildResetStatusBanner(),
 
               // 1. Error banner logic (Existing feature)
               if (error != null)
@@ -307,5 +334,80 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ],
       ),
     );
+  }
+
+  void _showResetConfirmation(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Day'),
+        content: const Text(
+          'This will reset all medicines for today (mark as not taken, clear snoozes). '
+          'This is mainly for testing the daily reset functionality.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await ref.read(medicineProvider.notifier).performManualReset();
+              _showSnackBar(
+                  context,
+                  'Day reset successfully! All medicines are now pending.',
+                  Colors.green);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.blue),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResetStatusBanner() {
+    return FutureBuilder<DateTime?>(
+      future: _getLastResetDate(),
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          final lastReset = snapshot.data!;
+          final today = DateTime.now();
+          final isToday = lastReset.year == today.year &&
+              lastReset.month == today.month &&
+              lastReset.day == today.day;
+
+          return Container(
+            width: double.infinity,
+            color: isToday ? Colors.green.shade50 : Colors.orange.shade50,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              isToday
+                  ? 'Daily reset: Today at ${DateFormat('HH:mm').format(lastReset)}'
+                  : 'Last reset: ${DateFormat('MMM d, HH:mm').format(lastReset)}',
+              style: TextStyle(
+                fontSize: 12,
+                color: isToday ? Colors.green.shade700 : Colors.orange.shade700,
+              ),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  Future<DateTime?> _getLastResetDate() async {
+    try {
+      final box = Hive.box('app_settings');
+      final timestamp = box.get('last_reset_date');
+      if (timestamp != null) {
+        return DateTime.fromMillisecondsSinceEpoch(timestamp);
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+    return null;
   }
 }
